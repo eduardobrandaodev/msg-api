@@ -3,11 +3,13 @@ import os
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 import pytz
+import asyncio
 
 app = FastAPI()
 
-# Função para enviar a mensagem
+# ===== Função para enviar mensagem =====
 async def enviar_mensagem():
     instance_id = os.getenv("INSTANCE_ID")
     token = os.getenv("TOKEN")
@@ -21,19 +23,41 @@ async def enviar_mensagem():
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload)
             data = response.json()
-        print("Mensagem enviada com sucesso:", data)
+        print("✅ Mensagem enviada com sucesso:", data)
     except Exception as e:
-        print("Erro ao enviar mensagem:", str(e))
+        print("❌ Erro ao enviar mensagem:", str(e))
 
-# Agendando o envio todo dia às 6h (horário de Brasília)
+# ===== Função de pinger =====
+async def pinger():
+    ping_url = os.getenv("PING_URL")
+    if not ping_url:
+        print("⚠️ Variável PING_URL não definida — pinger desativado.")
+        return
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(ping_url)
+        print(f"🔁 Pinger executado — status {r.status_code}")
+    except Exception as e:
+        print("❌ Erro no pinger:", e)
+
+# ===== Inicializar agendador =====
 scheduler = BackgroundScheduler(timezone=pytz.timezone("America/Sao_Paulo"))
+
+# Enviar mensagem todo dia às 6h da manhã (horário de Brasília)
 scheduler.add_job(
-    lambda: app.loop.create_task(enviar_mensagem()),  # cria task assíncrona
+    lambda: asyncio.create_task(enviar_mensagem()),
     CronTrigger(hour=6, minute=0)
 )
+
+# Executar pinger a cada 5 minutos
+scheduler.add_job(
+    lambda: asyncio.create_task(pinger()),
+    IntervalTrigger(minutes=5)
+)
+
 scheduler.start()
 
+# ===== Rotas FastAPI =====
 @app.get("/")
-def root():
-    return {"status": "Servidor rodando e cron ativo"}
-
+async def root():
+    return {"status": "ok", "mensagem": "Servidor ativo e cron funcionando."}
