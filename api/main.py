@@ -45,13 +45,13 @@ scheduler = BackgroundScheduler(timezone=pytz.timezone("America/Sao_Paulo"))
 
 # Enviar mensagem todo dia às 6h da manhã (horário de Brasília)
 scheduler.add_job(
-    lambda: asyncio.create_task(enviar_mensagem()),
+    lambda: asyncio.run(enviar_mensagem()),
     CronTrigger(hour=6, minute=0)
 )
 
 # Executar pinger a cada 5 minutos
 scheduler.add_job(
-    lambda: asyncio.create_task(pinger()),
+    lambda: asyncio.run(pinger()),
     IntervalTrigger(minutes=5)
 )
 
